@@ -1,0 +1,7 @@
+  Ajax調用過程中參數寫法
+
+        contentType: "application/json",
+        type: "post",
+        data: JSON.stringify({ user_name: $("#user_name").val(), user_pwd: $("#user_pwd").val() }),
+ C#接收時的參數寫法
+        public string Post_Login([FromBody] dynamic user)
