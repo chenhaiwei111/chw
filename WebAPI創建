@@ -1,0 +1,149 @@
+一、新建web api 项目
+
+在vs2017中选择新建项目-选择asp.net  web 应用程序，在如下图示项目选择窗口中，选择“空“项目，勾选 Web Api，确定后系统自动创建空的Web Api项目；
+
+
+
+二、设置路由
+
+默认情况下创建的Web Api 项目采用"api/{controller}/{id}" 的方式映射访问路由，即：api为默认路径前缀，controller对应为控制器名称中去掉controller中的部分，而接口名称采用get前缀的方法，即访问接口的method采用get，其它的依次类推，访问接口非常的机械且难以理解，可在控制器中使用RoutePrefix属性重新定义控制对应的访问路径名称，在方法中使用Route属性映射方法的访问路径，使用HttpGet等属性映射方法的访问method，这样可提高整个应用的灵活性和规范性；
+
+三、在web api中启用会话支持
+
+web api默认情况并不支持会话，通过 HttpContext.Current.Session访问相关会话对象时，总是为null，需要使用以下方法启用会话支持：
+
+重写global.asax对象对的  Init() 方法，示例代码如下：
+    
+
+ public override void Init()
+        {
+            //=======================启用会话=============================
+            this.PostAuthenticateRequest += (sender, e) => HttpContext.Current.SetSessionStateBehavior(SessionStateBehavior.Required);
+            base.Init();
+        }
+四、对接口启用访问认证
+
+新建RequestAuthorizeAttribute类，该类继承至AuthorizeAttribute，重写父类的OnAuthorization方法；在需要验证的接口方法中使用RequestAuthorizeAttribute属性，RequestAuthorizeAttribute代码如下：
+
+ public class RequestAuthorizeAttribute : AuthorizeAttribute
+    {
+        public override void OnAuthorization(System.Web.Http.Controllers.HttpActionContext actionContext)
+        {
+            //从http请求的头里面获取身份验证信息，验证是否是请求发起方的ticket
+            var authorization = actionContext.Request.Headers.Authorization;
+            if ((authorization != null) && (authorization.Parameter != null))
+            {
+                //解密用户ticket,并校验用户名密码是否匹配
+                var encryptTicket = authorization.Parameter;
+                if (ValidateTicket(encryptTicket))
+                {
+                    base.IsAuthorized(actionContext);
+                }
+                else
+                {
+                    HandleUnauthorizedRequest(actionContext);
+                }
+            }
+            //如果取不到身份验证信息，并且不允许匿名访问，则返回未验证401
+            else
+            {
+                var attributes = actionContext.ActionDescriptor.GetCustomAttributes<AllowAnonymousAttribute>().OfType<AllowAnonymousAttribute>();
+                bool isAnonymous = attributes.Any(a => a is AllowAnonymousAttribute);
+                if (isAnonymous) base.OnAuthorization(actionContext);
+                else HandleUnauthorizedRequest(actionContext);
+            }
+        }
+ 
+        //校验用户名密码（正式环境中应该是数据库校验）
+        private bool ValidateTicket(string encryptTicket)
+        {
+            //解密Ticket
+            var strTicket = FormsAuthentication.Decrypt(encryptTicket).UserData;
+ 
+            //从Ticket里面获取用户名和密码
+            var index = strTicket.IndexOf("&");
+            string strUser = strTicket.Substring(0, index);
+            string strPwd = strTicket.Substring(index + 1);
+ 
+            if (strUser == "test" && strPwd == "123456")
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+接口启用验证的示例代码如下：
+
+        [HttpPut]
+        [RequestAuthorize]
+        [Route("update/{id}")]
+        public LoginToken update(string id,[FromBody] Logins login)
+        {
+            System.Diagnostics.Debug.WriteLine(login);
+ 
+            LoginToken token = new LoginToken { token = "1111111111", userId = "test", userName = "test" };
+            return token;
+        }
+五、webApi接口参数
+
+1、接口调用方式：webap有put、get、delete、post等集中调用方式，在未显示说明接口调用方式属性时，对Get开始的方法默认为采用get方式（post、put、delete类似），若接口方法默认不符合约定，则需要使用属性明确说明；
+
+2、对get方法可适用[Fromuri] 参数,说明接口参数来自于url，而post、put、delete方法可采用[frombody]属性将来自于http数据部分的数据序列化为指定对的对象的类型，当不明确来自于数据部分的对象类型，对接口参数采用dynamic类型是不错的选择，示例如下：
+
+前端提交的数据内容：
+
+   $.ajax({
+        type: "post",
+        url: "http://localhost:27221/api/Charging/SaveData",
+        contentType: 'application/json',
+        data: JSON.stringify({ NAME: "Jim",DES:"备注" }),
+        success: function (data, status) {}
+    });
+后端数据接口：
+
+        [HttpPost]
+        public object SaveData(dynamic obj)
+        {
+            var strName = Convert.ToString(obj.NAME);
+            return strName;
+        }
+需要注意的是：若需要dynamic对象直接序列化为对象，需要在前端提交数据的时候，将数据用JSON.stringfy(data)序列化为json对象，否则后端得到的是层层嵌套的对象；
+
+3、接口采用对象，如下示例接口：
+
+[HttpPost]
+        public bool SaveData(TB_CHARGING oData)
+        {
+            return true;
+        }
+同上：明确采用json格式进行数据传递时，需要用JSON.stringfy(data)序列化为json对象
+
+对接口传递数组对象时，可采用List<ObjectType>的类型传递接口参数，示例如下：
+
+ [HttpPost]
+        public bool SaveData(List<TB_CHARGING> lstCharging)
+        {
+            return true;
+        }
+六、利用webApi上传文件
+
+前端需要content-type信息为：
+
+"Content-Type":"multipart/form-data"
+后端代码如下示例：
+
+HttpRequest httpRequest = HttpContext.Current.Request;
+            foreach (string file in httpRequest.Files)
+            {
+                System.Diagnostics.Debug.WriteLine(httpRequest.Files[file].FileName);
+                System.IO.Stream inStream = httpRequest.Files[file].InputStream;
+                byte[] buffer = new byte[inStream.Length];
+                inStream.Read(buffer, 0, buffer.Length);
+                
+                var filePath = HttpContext.Current.Server.MapPath("~/" + httpRequest.Files[file].FileName);
+                httpRequest.Files[file].SaveAs(filePath);
+            }
+ 
