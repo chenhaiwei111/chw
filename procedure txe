@@ -1,0 +1,30 @@
+ PROCEDURE xp_WriteFile(da_tel  varchar2,
+                         dt_bh   varchar2,
+                         dt_da   varchar2,
+                         dt_date date) as
+    
+    fno utl_file.file_type;
+    rec varchar2(2000);
+  
+    G_FILEPATH VARCHAR2(20) := 'ROOT';--文本存放的路径
+    G_FILENAME VARCHAR2(20) := to_char(dt_date, 'yyyymmddhh24miss'); --'test.txt'; 
+  begin
+  
+    fno := utl_file.fopen(G_FILEPATH, G_FILENAME, 'W', 3000);
+  
+    begin
+      utl_file.put_line(fno, 'Write   Test');
+      utl_file.put_line(fno, '0123456789');
+      rec := to_char(sysdate, 'yyyy.mm.dd   hh24:mi:ss');
+      rec := 'abc   ' || rec || '   def';
+      utl_file.put_line(fno, rec);
+    exception
+      when OTHERS then
+        dbms_output.put_line('**   Write   Error');
+    end;
+  
+    utl_file.fclose(fno);
+  end;
+————————————————
+版权声明：本文为CSDN博主「wgpling」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/wgpling/java/article/details/3136029
