@@ -1,0 +1,25 @@
+[Route("customers/{customerId}/orders")]
+        [HttpGet]
+        public IEnumerable<Order> FindOrdersByCustomer(int customerId)
+        {
+            return Database.GetOrdersByCustomerId(customerId);
+        }
+        
+        
+[RoutePrefix("api")]
+public class OrdersController : ApiController
+{
+[Route("customers/{customerId}/orders")]
+[HttpGet]
+public IEnumerable<Order> FindOrdersByCustomer(int customerId)
+{
+return Database.GetOrdersByCustomerId(customerId);
+}
+}
+
+
+
+https://www.cnblogs.com/dinggf/p/11138043.html
+
+
+        
