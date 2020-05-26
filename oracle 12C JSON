@@ -1,0 +1,11 @@
+12C新增加了对json的支持。很简单的实现。如：
+SQL code
+?
+1
+2
+3
+4
+select JSON_OBJECT(key 'id' value id,key 'name' value name,key 'age' value age)
+from (
+select 1 id,'小明' name,15 age from dual
+)
